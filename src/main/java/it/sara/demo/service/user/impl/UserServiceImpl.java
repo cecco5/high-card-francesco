@@ -17,56 +17,41 @@ import org.springframework.stereotype.Service;
 @Service
 public class UserServiceImpl implements UserService {
 
-    @Autowired
-    private StringUtil stringUtil;
+  @Autowired private StringUtil stringUtil;
 
-    @Autowired
-    private UserRepository userRepository;
+  @Autowired private UserRepository userRepository;
 
-    @Override
-    public AddUserResult addUser(CriteriaAddUser criteria) throws GenericException {
+  @Override
+  public AddUserResult addUser(CriteriaAddUser criteria) throws GenericException {
 
-        AddUserResult returnValue;
-        User user;
+    AddUserResult returnValue;
+    User user;
 
-        try {
+    try {
 
-            returnValue = new AddUserResult();
+      returnValue = new AddUserResult();
 
-            if (stringUtil.isNullOrEmpty(criteria.getFirstName())) {
-                throw new GenericException(400, "First name is required");
-            }
-            if (stringUtil.isNullOrEmpty(criteria.getLastName())) {
-                throw new GenericException(400, "Last name is required");
-            }
-            if (stringUtil.isNullOrEmpty(criteria.getEmail())) {
-                throw new GenericException(400, "Email is required");
-            }
-            if (stringUtil.isNullOrEmpty(criteria.getPhoneNumber())) {
-                throw new GenericException(400, "Phone is required");
-            }
+      user = new User();
+      user.setFirstName(criteria.getFirstName());
+      user.setLastName(criteria.getLastName());
+      user.setEmail(criteria.getEmail());
+      user.setPhoneNumber(criteria.getPhoneNumber());
 
-            user = new User();
-            user.setFirstName(criteria.getFirstName());
-            user.setLastName(criteria.getLastName());
-            user.setEmail(criteria.getEmail());
-            user.setPhoneNumber(criteria.getPhoneNumber());
+      if (!userRepository.save(user)) {
+        throw new GenericException(500, "Error saving user");
+      }
 
-            if (!userRepository.save(user)) {
-                throw new GenericException(500, "Error saving user");
-            }
-
-        } catch (Exception e) {
-            if (log.isErrorEnabled()) {
-                log.error(e.getMessage(), e);
-            }
-            throw new GenericException(GenericException.GENERIC_ERROR);
-        }
-        return returnValue;
+    } catch (Exception e) {
+      if (log.isErrorEnabled()) {
+        log.error(e.getMessage(), e);
+      }
+      throw new GenericException(GenericException.GENERIC_ERROR);
     }
+    return returnValue;
+  }
 
-    @Override
-    public GetUsersResult getUsers(CriteriaGetUsers criteriaGetUsers) throws GenericException {
-        return null;
-    }
+  @Override
+  public GetUsersResult getUsers(CriteriaGetUsers criteriaGetUsers) throws GenericException {
+    return null;
+  }
 }

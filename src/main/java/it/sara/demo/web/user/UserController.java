@@ -8,6 +8,7 @@ import it.sara.demo.web.response.GenericResponse;
 import it.sara.demo.web.user.request.AddUserRequest;
 import it.sara.demo.web.user.request.GetUsersRequest;
 import it.sara.demo.web.user.response.GetUsersResponse;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -26,7 +27,7 @@ public class UserController {
     private AddUserAssembler addUserAssembler;
 
     @RequestMapping(value = {"/v1/user"}, method = RequestMethod.PUT)
-    public ResponseEntity<GenericResponse> addUser(@RequestBody AddUserRequest request) throws GenericException {
+    public ResponseEntity<GenericResponse> addUser(@Valid @RequestBody AddUserRequest request) throws GenericException {
         CriteriaAddUser criteria = addUserAssembler.toCriteria(request);
         userService.addUser(criteria);
         return ResponseEntity.ok(GenericResponse.success("User added."));
