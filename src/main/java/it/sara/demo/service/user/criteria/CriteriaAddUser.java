@@ -1,31 +1,25 @@
 package it.sara.demo.service.user.criteria;
 
 import it.sara.demo.service.criteria.GenericCriteria;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
 import lombok.Getter;
 import lombok.Setter;
 
+/**
+ * Service layer criteria for adding a new user.
+ *
+ * <p>This DTO is used internally by the service layer and does not contain
+ * validation annotations. Input validation is performed at the web layer
+ * ({@code AddUserRequest}) before data reaches this criteria.</p>
+ *
+ * <p>This design maintains separation of concerns and allows the service layer
+ * to remain independent from web framework validation constraints.</p>
+ */
 @Getter
 @Setter
 public class CriteriaAddUser extends GenericCriteria {
 
-  @NotBlank(message = "First name is required")
   private String firstName;
-
-  @NotBlank(message = "Last name is required")
   private String lastName;
-
-  @NotBlank(message = "Email is required")
-  @Email(
-      regexp = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$",
-      message = "Email must be valid")
   private String email;
-
-  @NotBlank(message = "Phone number is required")
-  @Pattern(
-      regexp = "^(\\+39)?\\s?3\\d{2}\\s?\\d{6,7}$",
-      message = "Phone number must be a valid Italian mobile number")
   private String phoneNumber;
 }
