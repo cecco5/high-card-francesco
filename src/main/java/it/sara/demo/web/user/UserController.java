@@ -22,9 +22,11 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>This controller handles HTTP requests for user management, including
  * creation and retrieval of users. All responses follow the standard
  * {@code StatusDTO} format with HTTP 200 status codes.</p>
+ *
+ * <p><strong>Security:</strong> All endpoints require ADMIN role (configured in SecurityConfig).</p>
  */
 @RestController
-@RequestMapping("/user")
+@RequestMapping("/api/users")
 public class UserController {
 
   private final UserService userService;

@@ -1,6 +1,7 @@
 package it.sara.demo.service.user.impl;
 
 import it.sara.demo.exception.GenericException;
+import it.sara.demo.exception.SqlInjectionException;
 import it.sara.demo.service.database.UserRepository;
 import it.sara.demo.service.database.model.User;
 import it.sara.demo.service.user.UserService;
@@ -37,7 +38,7 @@ public class UserServiceImpl implements UserService {
    * <p><strong>Security Strategy - Defense in Depth:</strong></p>
    * <ul>
    *   <li>Layer 1: Bean Validation via {@code @Valid} in Controller</li>
-   *   <li>Layer 2: Regex validation in {@link CriteriaAddUser} ({@code @Email}, {@code @Pattern})</li>
+   *   <li>Layer 2: Regex validation in {@link it.sara.demo.web.user.request.AddUserRequest}</li>
    *   <li>Layer 3: Input sanitization in Service Layer (removes SQL dangerous characters)</li>
    *   <li>Layer 4: SQL keyword detection to prevent injection attempts</li>
    * </ul>
@@ -45,9 +46,14 @@ public class UserServiceImpl implements UserService {
    * <p>Even though the current implementation uses {@code FakeDatabase} (in-memory list),
    * this sanitization prepares the code for migration to a real database with prepared statements.</p>
    *
+   * <p><strong>Exception Handling:</strong> This method throws specific exceptions
+   * ({@link SqlInjectionException}) which are caught by the {@code GlobalExceptionHandler}
+   * for centralized error management.</p>
+   *
    * @param criteria Validated user data from the web layer
    * @return AddUserResult confirmation of user creation
-   * @throws GenericException if validation fails, SQL patterns detected, or save operation fails
+   * @throws SqlInjectionException if SQL injection patterns are detected in input
+   * @throws GenericException if save operation fails or unexpected errors occur
    */
   @Override
   public AddUserResult addUser(CriteriaAddUser criteria) throws GenericException {
@@ -58,6 +64,7 @@ public class UserServiceImpl implements UserService {
     try {
 
       // Additional validation: detect SQL injection patterns
+      // This throws SqlInjectionException which extends GenericException
       validateAgainstSqlInjection(criteria);
 
       returnValue = new AddUserResult();
@@ -76,10 +83,14 @@ public class UserServiceImpl implements UserService {
       // Set the created user in the result
       returnValue.setUser(user);
 
+    } catch (SqlInjectionException e) {
+      // Re-throw specific SQL injection exception (caught by GlobalExceptionHandler)
+      throw e;
     } catch (GenericException e) {
-      // Re-throw GenericException with original code
+      // Re-throw other business exceptions (caught by GlobalExceptionHandler)
       throw e;
     } catch (Exception e) {
+      // Wrap unexpected exceptions in GenericException
       if (log.isErrorEnabled()) {
         log.error(e.getMessage(), e);
       }
@@ -122,9 +133,9 @@ public class UserServiceImpl implements UserService {
    * </ul>
    *
    * @param criteria User data to validate
-   * @throws GenericException with 400 status code if SQL patterns are detected
+   * @throws SqlInjectionException if SQL patterns are detected
    */
-  private void validateAgainstSqlInjection(CriteriaAddUser criteria) throws GenericException {
+  private void validateAgainstSqlInjection(CriteriaAddUser criteria) throws SqlInjectionException {
     // SQL keywords commonly used in injection attacks
     String[] sqlKeywords = {"DROP", "DELETE", "INSERT", "UPDATE", "SELECT", "--", "/*", "*/"};
 
@@ -142,7 +153,7 @@ public class UserServiceImpl implements UserService {
         if (log.isWarnEnabled()) {
           log.warn("SQL injection attempt detected. Keyword found: {}", keyword);
         }
-        throw new GenericException(400, "Invalid input: SQL keywords detected");
+        throw new SqlInjectionException("Invalid input: SQL keywords detected");
       }
     }
   }
