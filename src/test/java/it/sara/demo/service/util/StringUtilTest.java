@@ -7,17 +7,6 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Focused unit tests for {@link StringUtil}.
- *
- * <p>Copriono solo i casi rilevanti per l'esercizio:
- * <ul>
- *   <li>check null/empty</li>
- *   <li>sanitizzazione di base</li>
- *   <li>rilevamento SQL injection per alcune keyword</li>
- *   <li>un caso "clean" che non deve lanciare eccezione</li>
- * </ul>
- */
 @DisplayName("StringUtil Focused Unit Tests")
 class StringUtilTest {
 
@@ -52,19 +41,23 @@ class StringUtilTest {
   @Test
   @DisplayName("validateAgainstSqlInjection - should detect main SQL keywords")
   void testValidateAgainstSqlInjection_DetectsKeywords() {
-    assertThrows(SqlInjectionException.class,
+    assertThrows(
+        SqlInjectionException.class,
         () -> stringUtil.validateAgainstSqlInjection("DROP TABLE users"));
-    assertThrows(SqlInjectionException.class,
+    assertThrows(
+        SqlInjectionException.class,
         () -> stringUtil.validateAgainstSqlInjection("DELETE FROM users"));
-    assertThrows(SqlInjectionException.class,
+    assertThrows(
+        SqlInjectionException.class,
         () -> stringUtil.validateAgainstSqlInjection("SELECT * FROM users"));
   }
 
   @Test
   @DisplayName("validateAgainstSqlInjection - should not throw for clean input")
   void testValidateAgainstSqlInjection_Clean() {
-    assertDoesNotThrow(() ->
-        stringUtil.validateAgainstSqlInjection(
-            "John", "Doe", "john.doe@example.com", "+39 320 1234567"));
+    assertDoesNotThrow(
+        () ->
+            stringUtil.validateAgainstSqlInjection(
+                "John", "Doe", "john.doe@example.com", "+39 320 1234567"));
   }
 }

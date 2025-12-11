@@ -1,14 +1,10 @@
 package it.sara.demo.web.login;
 
-import it.sara.demo.dto.LoginResponseDTO;
-import it.sara.demo.dto.StatusDTO;
 import it.sara.demo.exception.InvalidCredentialsException;
 import it.sara.demo.security.util.JwtUtil;
 import it.sara.demo.web.login.request.LoginRequest;
 import it.sara.demo.web.login.response.LoginWebResponse;
 import jakarta.validation.Valid;
-import java.util.List;
-import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -48,18 +44,15 @@ public class AuthController {
   @PostMapping("/login")
   public ResponseEntity<LoginWebResponse> login(@Valid @RequestBody LoginRequest request)
       throws InvalidCredentialsException {
+    // TODO: Hardcoded credentials are for demo purposes only.
+    //  In production, retrieve user credentials from database (e.g., via UserRepository/UserService)
+    //  and validate using BCryptPasswordEncoder or similar hashing algorithm.
     if ("admin".equals(request.getUsername()) && "password".equals(request.getPassword())) {
-      String token = jwtUtil.generateToken("admin", List.of("ROLE_ADMIN"));
-
-      LoginResponseDTO loginData = new LoginResponseDTO(token, "Bearer");
+      String token = jwtUtil.generateToken("admin", java.util.List.of("ROLE_ADMIN"));
 
       LoginWebResponse response = new LoginWebResponse();
-      StatusDTO status = new StatusDTO();
-      status.setCode(200);
-      status.setMessage("Login successful");
-      status.setTraceId(UUID.randomUUID().toString());
-      response.setStatus(status);
-      response.setData(loginData);
+      response.setToken(token);
+      response.setTokenType("Bearer");
 
       return ResponseEntity.ok(response);
     }

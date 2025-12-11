@@ -11,12 +11,6 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Focused unit tests for {@link UserFilterUtil}.
- *
- * <p>Copriono filtro per query e ordinamento base, sufficienti per i casi d'uso
- * di ricerca utenti nell'esercizio.</p>
- */
 @DisplayName("UserFilterUtil Focused Unit Tests")
 class UserFilterUtilTest {
 

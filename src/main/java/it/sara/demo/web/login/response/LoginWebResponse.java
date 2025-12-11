@@ -1,22 +1,24 @@
 package it.sara.demo.web.login.response;
 
-import it.sara.demo.dto.LoginResponseDTO;
-import it.sara.demo.web.response.GenericResponse;
 import lombok.Getter;
 import lombok.Setter;
 
 /**
  * Response DTO for login operations.
  *
- * <p>Contains the JWT token along with the standard status information.</p>
+ * <p>Contains the JWT token and its type.</p>
  */
 @Getter
 @Setter
-public class LoginWebResponse extends GenericResponse {
+public class LoginWebResponse {
 
     /**
-     * The login data containing the JWT token.
+     * The JWT token returned by the authentication process.
      */
-    private LoginResponseDTO data;
-}
+    private String token;
 
+    /**
+     * The token type, e.g., "Bearer".
+     */
+    private String tokenType;
+}
