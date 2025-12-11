@@ -2,6 +2,7 @@ package it.sara.demo.service.user.impl;
 
 import it.sara.demo.dto.UserDTO;
 import it.sara.demo.exception.GenericException;
+import it.sara.demo.exception.InvalidPaginationException;
 import it.sara.demo.exception.SqlInjectionException;
 import it.sara.demo.service.assembler.UserAssembler;
 import it.sara.demo.service.database.UserRepository;
@@ -74,11 +75,7 @@ public class UserServiceImpl implements UserService {
   @Override
   public AddUserResult addUser(CriteriaAddUser criteria) throws GenericException {
 
-    AddUserResult returnValue;
-    User user;
-
     try {
-
       // Additional validation: detect SQL injection patterns (delegated to StringUtil)
       // This throws SqlInjectionException which extends GenericException
       stringUtil.validateAgainstSqlInjection(
@@ -87,36 +84,35 @@ public class UserServiceImpl implements UserService {
           criteria.getEmail(),
           criteria.getPhoneNumber());
 
-      returnValue = new AddUserResult();
-
-      user = new User();
-      // Apply sanitization to all user inputs (delegated to StringUtil)
+      // Build and sanitize user entity
+      User user = new User();
       user.setFirstName(stringUtil.sanitizeInput(criteria.getFirstName()));
       user.setLastName(stringUtil.sanitizeInput(criteria.getLastName()));
       user.setEmail(stringUtil.sanitizeInput(criteria.getEmail()));
       user.setPhoneNumber(stringUtil.sanitizeInput(criteria.getPhoneNumber()));
 
+      // Persist user (FakeDatabase in this exercise)
       if (!userRepository.save(user)) {
+        // Specific business/technical error for save failure
         throw new GenericException(500, "Error saving user");
       }
 
-      // Set the created user in the result
-      returnValue.setUser(user);
+      AddUserResult result = new AddUserResult();
+      result.setUser(user);
+      return result;
 
-    } catch (SqlInjectionException e) {
-      // Re-throw specific SQL injection exception (caught by GlobalExceptionHandler)
-      throw e;
-    } catch (GenericException e) {
-      // Re-throw other business exceptions (caught by GlobalExceptionHandler)
-      throw e;
     } catch (Exception e) {
-      // Wrap unexpected exceptions in GenericException
+      // Preserve all business/domain exceptions (GenericException and subclasses)
+      if (e instanceof GenericException genericException) {
+        throw genericException;
+      }
+
+      // Wrap any unexpected exception in a GenericException for consistent handling
       if (log.isErrorEnabled()) {
-        log.error(e.getMessage(), e);
+        log.error("Unexpected error while adding user: {}", e.getMessage(), e);
       }
       throw new GenericException(GenericException.GENERIC_ERROR);
     }
-    return returnValue;
   }
 
 
@@ -163,6 +159,11 @@ public class UserServiceImpl implements UserService {
   @Override
   public GetUsersResult getUsers(CriteriaGetUsers criteria) throws GenericException {
     try {
+      // Basic pagination validation
+      if (criteria.getLimit() <= 0 || criteria.getOffset() < 0) {
+        throw new InvalidPaginationException("Invalid pagination parameters: offset must be >= 0 and limit must be > 0");
+      }
+
       // Step 1: Get all users from repository
       List<User> allUsers = userRepository.getAll();
 
@@ -194,9 +195,15 @@ public class UserServiceImpl implements UserService {
       return result;
 
     } catch (Exception e) {
+      // Propagate any business/domain exception as-is
+      if (e instanceof GenericException genericException) {
+        throw genericException;
+      }
+
       if (log.isErrorEnabled()) {
         log.error("Error retrieving users: {}", e.getMessage(), e);
       }
+      // Fallback generic error for unexpected exceptions
       throw new GenericException(GenericException.GENERIC_ERROR);
     }
   }
