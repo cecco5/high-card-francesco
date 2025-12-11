@@ -14,8 +14,8 @@ import org.springframework.stereotype.Component;
 /**
  * Utility class for JWT token generation and validation.
  *
- * <p>Handles creation of JWT tokens with username, roles, issuer, and expiration.
- * Validates tokens by verifying signature, issuer, and expiration time.</p>
+ * <p>Handles creation of JWT tokens with username, roles, issuer, and expiration. Validates tokens
+ * by verifying signature, issuer, and expiration time.
  */
 @Component
 public class JwtUtil {
@@ -78,25 +78,10 @@ public class JwtUtil {
   }
 
   /**
-   * Extracts username from a validated token.
+   * Generates the signing key from the configured secret.
    *
-   * @param token JWT token
-   * @return Username (subject) from token
+   * @return HMAC-SHA key for signing and verifying JWT tokens
    */
-  public String extractUsername(String token) {
-    return validateToken(token).getSubject();
-  }
-
-  /**
-   * Extracts user roles from a validated token.
-   *
-   * @param token JWT token
-   * @return List of roles from token claims
-   */
-  public List<String> extractRoles(String token) {
-    return validateToken(token).get("roles", List.class);
-  }
-
   private Key getSigningKey() {
     return Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
   }

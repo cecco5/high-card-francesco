@@ -7,8 +7,15 @@ import lombok.Setter;
 
 import java.util.List;
 
+/**
+ * Service layer result for paginated user search operation.
+ *
+ * <p>Contains a list of users matching the search criteria along
+ * with pagination metadata (total count) inherited from {@code GenericPagedResult}.</p>
+ */
 @Getter
 @Setter
 public class GetUsersResult extends GenericPagedResult {
-    private List<UserDTO> users;
+  /** List of users matching the search criteria for the current page. */
+  private List<UserDTO> users;
 }

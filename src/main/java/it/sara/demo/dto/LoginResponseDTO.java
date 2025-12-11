@@ -6,10 +6,10 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * DTO for login response containing JWT token.
+ * Data Transfer Object for login response containing JWT token.
  *
- * <p>Follows the naming convention of other DTOs in this package
- * (StatusDTO, UserDTO) for consistency.</p>
+ * <p>Used to transfer authentication token information from service
+ * to web layer after successful login.</p>
  */
 @Getter
 @Setter
@@ -17,15 +17,9 @@ import lombok.Setter;
 @AllArgsConstructor
 public class LoginResponseDTO {
 
-    /**
-     * The JWT token to be used for authenticated requests.
-     */
-    private String token;
+  /** The JWT authentication token. */
+  private String token;
 
-    /**
-     * The token type (always "Bearer" for JWT).
-     */
-    private String tokenType;
+  /** The type of token (typically "Bearer"). */
+  private String tokenType;
 }
-
-

@@ -1,7 +1,9 @@
 package it.sara.demo.service.user.impl;
 
+import it.sara.demo.dto.UserDTO;
 import it.sara.demo.exception.GenericException;
 import it.sara.demo.exception.SqlInjectionException;
+import it.sara.demo.service.assembler.UserAssembler;
 import it.sara.demo.service.database.UserRepository;
 import it.sara.demo.service.database.model.User;
 import it.sara.demo.service.user.UserService;
@@ -10,8 +12,11 @@ import it.sara.demo.service.user.criteria.CriteriaGetUsers;
 import it.sara.demo.service.user.result.AddUserResult;
 import it.sara.demo.service.user.result.GetUsersResult;
 import it.sara.demo.service.util.StringUtil;
+import it.sara.demo.service.util.UserFilterUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Slf4j
 @Service
@@ -19,36 +24,47 @@ public class UserServiceImpl implements UserService {
 
   private final UserRepository userRepository;
   private final StringUtil stringUtil;
+  private final UserAssembler userAssembler;
+  private final UserFilterUtil userFilterUtil;
 
   /**
-   * Constructor-based dependency injection (best practice).
-   * Allows for immutable fields, easier testing, and explicit dependencies.
+   * Constructor-based dependency injection (best practice). Allows for immutable fields, easier
+   * testing, and explicit dependencies.
    *
    * @param userRepository Repository for user data access
-   * @param stringUtil Utility class for string operations
+   * @param stringUtil Utility class for string operations and validation
+   * @param userAssembler Assembler for User entity to DTO conversion
+   * @param userFilterUtil Utility for filtering and sorting users
    */
-  public UserServiceImpl(UserRepository userRepository, StringUtil stringUtil) {
+  public UserServiceImpl(
+      UserRepository userRepository,
+      StringUtil stringUtil,
+      UserAssembler userAssembler,
+      UserFilterUtil userFilterUtil) {
     this.userRepository = userRepository;
     this.stringUtil = stringUtil;
+    this.userAssembler = userAssembler;
+    this.userFilterUtil = userFilterUtil;
   }
 
   /**
    * Adds a new user to the system with SQL injection prevention.
    *
-   * <p><strong>Security Strategy - Defense in Depth:</strong></p>
+   * <p><strong>Security Strategy - Defense in Depth:</strong>
+   *
    * <ul>
-   *   <li>Layer 1: Bean Validation via {@code @Valid} in Controller</li>
-   *   <li>Layer 2: Regex validation in {@link it.sara.demo.web.user.request.AddUserRequest}</li>
-   *   <li>Layer 3: Input sanitization in Service Layer (removes SQL dangerous characters)</li>
-   *   <li>Layer 4: SQL keyword detection to prevent injection attempts</li>
+   *   <li>Layer 1: Bean Validation via {@code @Valid} in Controller
+   *   <li>Layer 2: Regex validation in {@link it.sara.demo.web.user.request.AddUserRequest}
+   *   <li>Layer 3: Input sanitization in Service Layer (removes SQL dangerous characters)
+   *   <li>Layer 4: SQL keyword detection to prevent injection attempts
    * </ul>
    *
-   * <p>Even though the current implementation uses {@code FakeDatabase} (in-memory list),
-   * this sanitization prepares the code for migration to a real database with prepared statements.</p>
+   * <p>Even though the current implementation uses {@code FakeDatabase} (in-memory list), this
+   * sanitization prepares the code for migration to a real database with prepared statements.
    *
-   * <p><strong>Exception Handling:</strong> This method throws specific exceptions
-   * ({@link SqlInjectionException}) which are caught by the {@code GlobalExceptionHandler}
-   * for centralized error management.</p>
+   * <p><strong>Exception Handling:</strong> This method throws specific exceptions ({@link
+   * SqlInjectionException}) which are caught by the {@code GlobalExceptionHandler} for centralized
+   * error management.
    *
    * @param criteria Validated user data from the web layer
    * @return AddUserResult confirmation of user creation
@@ -63,18 +79,22 @@ public class UserServiceImpl implements UserService {
 
     try {
 
-      // Additional validation: detect SQL injection patterns
+      // Additional validation: detect SQL injection patterns (delegated to StringUtil)
       // This throws SqlInjectionException which extends GenericException
-      validateAgainstSqlInjection(criteria);
+      stringUtil.validateAgainstSqlInjection(
+          criteria.getFirstName(),
+          criteria.getLastName(),
+          criteria.getEmail(),
+          criteria.getPhoneNumber());
 
       returnValue = new AddUserResult();
 
       user = new User();
-      // Apply sanitization to all user inputs (defense in depth)
-      user.setFirstName(sanitizeInput(criteria.getFirstName()));
-      user.setLastName(sanitizeInput(criteria.getLastName()));
-      user.setEmail(sanitizeInput(criteria.getEmail()));
-      user.setPhoneNumber(sanitizeInput(criteria.getPhoneNumber()));
+      // Apply sanitization to all user inputs (delegated to StringUtil)
+      user.setFirstName(stringUtil.sanitizeInput(criteria.getFirstName()));
+      user.setLastName(stringUtil.sanitizeInput(criteria.getLastName()));
+      user.setEmail(stringUtil.sanitizeInput(criteria.getEmail()));
+      user.setPhoneNumber(stringUtil.sanitizeInput(criteria.getPhoneNumber()));
 
       if (!userRepository.save(user)) {
         throw new GenericException(500, "Error saving user");
@@ -99,67 +119,86 @@ public class UserServiceImpl implements UserService {
     return returnValue;
   }
 
-  /**
-   * Sanitizes user input by removing potentially dangerous SQL characters.
-   * Applied as defense in depth, even after Bean Validation.
-   *
-   * <p><strong>Removed characters:</strong></p>
-   * <ul>
-   *   <li>{@code ;} - SQL statement terminator</li>
-   *   <li>{@code <} {@code >} - XML/XSS attack vectors</li>
-   *   <li>{@code "} {@code '} - SQL string delimiters</li>
-   *   <li>{@code \} - Escape character</li>
-   * </ul>
-   *
-   * @param input User input string to sanitize
-   * @return Sanitized string with dangerous characters removed, or null if input is null
-   */
-  private String sanitizeInput(String input) {
-    if (input == null) {
-      return null;
-    }
-    // Remove SQL dangerous characters and trim whitespace
-    return input.trim().replaceAll("[;<>\"'\\\\]", "");
-  }
+
 
   /**
-   * Validates user input against common SQL injection patterns.
-   * Detects SQL keywords and comment markers in combined user input.
+   * Retrieves a paginated and sorted list of users with optional filtering.
    *
-   * <p><strong>Detected patterns:</strong></p>
+   * <p><strong>Features:</strong>
+   *
    * <ul>
-   *   <li>SQL DML keywords: DROP, DELETE, INSERT, UPDATE, SELECT</li>
-   *   <li>SQL comment markers: {@code --}, {@code /*}, {@code * /}</li>
+   *   <li>Case-insensitive search on firstName, lastName, and email
+   *   <li>Sorting by OrderType enum (firstName, lastName, ASC/DESC)
+   *   <li>Pagination with offset and limit
    * </ul>
    *
-   * @param criteria User data to validate
-   * @throws SqlInjectionException if SQL patterns are detected
+   * <p><strong>Implementation Details:</strong>
+   *
+   * <ol>
+   *   <li>Filter users by search query (if provided)
+   *   <li>Count total matches (for pagination metadata)
+   *   <li>Apply sorting based on OrderType
+   *   <li>Apply pagination (skip offset, take limit)
+   *   <li>Convert User entities to UserDTOs
+   * </ol>
+   *
+   * <p><strong>Note on Implementation:</strong>
+   *
+   * <p>The current implementation uses Java Streams for filtering, sorting, and pagination because
+   * this application uses {@code FakeDatabase} (in-memory list). In a real-world scenario with a
+   * database (e.g., PostgreSQL, MySQL), this logic would leverage <strong>Spring Data JPA</strong>
+   * with {@code Pageable} and {@code @Query} annotations to push filtering, sorting, and pagination
+   * to the database layer, significantly improving performance and scalability by:
+   *
+   * <ul>
+   *   <li>Generating optimized SQL queries (WHERE, ORDER BY, LIMIT, OFFSET)
+   *   <li>Reducing memory footprint (loading only requested records)
+   *   <li>Utilizing database indexes for faster searches
+   * </ul>
+   *
+   * @param criteria Search criteria with query, pagination, and sorting parameters
+   * @return GetUsersResult with filtered, sorted, paginated list and total count
+   * @throws GenericException if an unexpected error occurs
    */
-  private void validateAgainstSqlInjection(CriteriaAddUser criteria) throws SqlInjectionException {
-    // SQL keywords commonly used in injection attacks
-    String[] sqlKeywords = {"DROP", "DELETE", "INSERT", "UPDATE", "SELECT", "--", "/*", "*/"};
-
-    // Combine all input fields for comprehensive check
-    String fullInput = String.join(" ",
-        criteria.getFirstName(),
-        criteria.getLastName(),
-        criteria.getEmail(),
-        criteria.getPhoneNumber()
-    ).toUpperCase();
-
-    // Check for SQL keywords
-    for (String keyword : sqlKeywords) {
-      if (fullInput.contains(keyword)) {
-        if (log.isWarnEnabled()) {
-          log.warn("SQL injection attempt detected. Keyword found: {}", keyword);
-        }
-        throw new SqlInjectionException("Invalid input: SQL keywords detected");
-      }
-    }
-  }
-
   @Override
-  public GetUsersResult getUsers(CriteriaGetUsers criteriaGetUsers) throws GenericException {
-    return null;
+  public GetUsersResult getUsers(CriteriaGetUsers criteria) throws GenericException {
+    try {
+      // Step 1: Get all users from repository
+      List<User> allUsers = userRepository.getAll();
+
+      // Step 2: Apply filtering (delegated to UserFilterUtil)
+      String searchQuery = criteria.getQuery();
+      List<User> filteredUsers =
+          allUsers.stream()
+              .filter(user -> userFilterUtil.matchesSearchQuery(user, searchQuery))
+              .toList();
+
+      // Step 3: Count total matches (BEFORE pagination)
+      int total = filteredUsers.size();
+
+      // Step 4: Apply sorting (delegated to UserFilterUtil)
+      List<User> sortedUsers = userFilterUtil.applySorting(filteredUsers, criteria.getOrder());
+
+      // Step 5: Apply pagination (offset and limit)
+      List<User> paginatedUsers =
+          sortedUsers.stream().skip(criteria.getOffset()).limit(criteria.getLimit()).toList();
+
+      // Step 6: Convert User entities to UserDTOs (delegated to UserAssembler)
+      List<UserDTO> userDTOs = paginatedUsers.stream().map(userAssembler::toDTO).toList();
+
+      // Step 7: Build result with users and pagination metadata
+      GetUsersResult result = new GetUsersResult();
+      result.setUsers(userDTOs);
+      result.setTotal(total);
+
+      return result;
+
+    } catch (Exception e) {
+      if (log.isErrorEnabled()) {
+        log.error("Error retrieving users: {}", e.getMessage(), e);
+      }
+      throw new GenericException(GenericException.GENERIC_ERROR);
+    }
   }
+
 }
