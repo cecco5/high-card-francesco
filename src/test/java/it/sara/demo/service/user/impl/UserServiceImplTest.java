@@ -7,6 +7,7 @@ import static org.mockito.Mockito.*;
 import it.sara.demo.dto.UserDTO;
 import it.sara.demo.exception.GenericException;
 import it.sara.demo.exception.SqlInjectionException;
+import it.sara.demo.exception.UserAlreadyExistsException;
 import it.sara.demo.service.assembler.UserAssembler;
 import it.sara.demo.service.database.UserRepository;
 import it.sara.demo.service.database.model.User;
@@ -86,6 +87,7 @@ class UserServiceImplTest {
   @DisplayName("addUser - Should successfully add a valid user")
   void testAddUser_Success() throws GenericException {
     // Arrange
+    when(userRepository.getAll()).thenReturn(List.of()); // No existing users
     doNothing()
         .when(stringUtil)
         .validateAgainstSqlInjection(anyString(), anyString(), anyString(), anyString());
@@ -134,6 +136,7 @@ class UserServiceImplTest {
   @DisplayName("addUser - Should throw GenericException when save fails")
   void testAddUser_SaveFails() throws GenericException {
     // Arrange
+    when(userRepository.getAll()).thenReturn(List.of()); // No existing users
     doNothing()
         .when(stringUtil)
         .validateAgainstSqlInjection(anyString(), anyString(), anyString(), anyString());
@@ -159,6 +162,7 @@ class UserServiceImplTest {
     criteriaAddUser.setEmail("test@example.com\"");
     criteriaAddUser.setPhoneNumber("+39 320 1234567;");
 
+    when(userRepository.getAll()).thenReturn(List.of()); // No existing users
     doNothing()
         .when(stringUtil)
         .validateAgainstSqlInjection(anyString(), anyString(), anyString(), anyString());
@@ -172,6 +176,64 @@ class UserServiceImplTest {
     // Assert
     assertNotNull(result);
     verify(stringUtil, times(4)).sanitizeInput(anyString());
+  }
+
+  @Test
+  @DisplayName("addUser - Should throw UserAlreadyExistsException when user already exists")
+  void testAddUser_UserAlreadyExists() throws GenericException {
+    // Arrange
+    User existingUser = new User();
+    existingUser.setGuid("existing-guid");
+    existingUser.setFirstName("John");
+    existingUser.setLastName("Doe");
+    existingUser.setEmail("john.doe@example.com");
+    existingUser.setPhoneNumber("+39 320 9999999");
+
+    when(userRepository.getAll()).thenReturn(List.of(existingUser));
+    doNothing()
+        .when(stringUtil)
+        .validateAgainstSqlInjection(anyString(), anyString(), anyString(), anyString());
+
+    // Act & Assert
+    UserAlreadyExistsException exception =
+        assertThrows(UserAlreadyExistsException.class, () -> userService.addUser(criteriaAddUser));
+
+    assertEquals(409, exception.getStatus().getCode());
+    assertTrue(exception.getStatus().getMessage().contains("John Doe"));
+    assertTrue(exception.getStatus().getMessage().contains("john.doe@example.com"));
+
+    // Verify no save was attempted
+    verify(userRepository, never()).save(any(User.class));
+  }
+
+  @Test
+  @DisplayName("addUser - Should be case-insensitive when checking for duplicates")
+  void testAddUser_CaseInsensitiveDuplicateCheck() throws GenericException {
+    // Arrange
+    User existingUser = new User();
+    existingUser.setGuid("existing-guid");
+    existingUser.setFirstName("JOHN");
+    existingUser.setLastName("DOE");
+    existingUser.setEmail("JOHN.DOE@EXAMPLE.COM");
+    existingUser.setPhoneNumber("+39 320 9999999");
+
+    when(userRepository.getAll()).thenReturn(List.of(existingUser));
+    doNothing()
+        .when(stringUtil)
+        .validateAgainstSqlInjection(anyString(), anyString(), anyString(), anyString());
+
+    criteriaAddUser.setFirstName("john");
+    criteriaAddUser.setLastName("doe");
+    criteriaAddUser.setEmail("john.doe@example.com");
+
+    // Act & Assert
+    UserAlreadyExistsException exception =
+        assertThrows(UserAlreadyExistsException.class, () -> userService.addUser(criteriaAddUser));
+
+    assertEquals(409, exception.getStatus().getCode());
+
+    // Verify no save was attempted
+    verify(userRepository, never()).save(any(User.class));
   }
 
   // ==================== GET USERS TESTS ====================

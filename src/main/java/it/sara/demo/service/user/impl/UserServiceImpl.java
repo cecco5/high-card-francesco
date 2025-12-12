@@ -4,6 +4,7 @@ import it.sara.demo.dto.UserDTO;
 import it.sara.demo.exception.GenericException;
 import it.sara.demo.exception.InvalidPaginationException;
 import it.sara.demo.exception.SqlInjectionException;
+import it.sara.demo.exception.UserAlreadyExistsException;
 import it.sara.demo.service.assembler.UserAssembler;
 import it.sara.demo.service.database.UserRepository;
 import it.sara.demo.service.database.model.User;
@@ -64,12 +65,13 @@ public class UserServiceImpl implements UserService {
    * sanitization prepares the code for migration to a real database with prepared statements.
    *
    * <p><strong>Exception Handling:</strong> This method throws specific exceptions ({@link
-   * SqlInjectionException}) which are caught by the {@code GlobalExceptionHandler} for centralized
+   * SqlInjectionException}, {@link UserAlreadyExistsException}) which are caught by the {@code GlobalExceptionHandler} for centralized
    * error management.
    *
    * @param criteria Validated user data from the web layer
    * @return AddUserResult confirmation of user creation
    * @throws SqlInjectionException if SQL injection patterns are detected in input
+   * @throws UserAlreadyExistsException if a user with the same first name, last name, and email already exists
    * @throws GenericException if save operation fails or unexpected errors occur
    */
   @Override
@@ -83,6 +85,13 @@ public class UserServiceImpl implements UserService {
           criteria.getLastName(),
           criteria.getEmail(),
           criteria.getPhoneNumber());
+
+      // Check if user already exists (by firstName, lastName, and email)
+      if (userAlreadyExists(criteria.getFirstName(), criteria.getLastName(), criteria.getEmail())) {
+        throw new UserAlreadyExistsException(
+            String.format("User with name '%s %s' and email '%s' already exists",
+                criteria.getFirstName(), criteria.getLastName(), criteria.getEmail()));
+      }
 
       // Build and sanitize user entity
       User user = new User();
@@ -208,4 +217,22 @@ public class UserServiceImpl implements UserService {
     }
   }
 
+  /**
+   * Checks if a user with the same first name, last name, and email already exists.
+   *
+   * <p>Performs a case-insensitive comparison to prevent duplicate users.
+   *
+   * @param firstName User's first name
+   * @param lastName User's last name
+   * @param email User's email address
+   * @return true if a user with matching attributes exists, false otherwise
+   */
+  private boolean userAlreadyExists(String firstName, String lastName, String email) {
+    return userRepository.getAll().stream()
+        .anyMatch(
+            user ->
+                user.getFirstName().equalsIgnoreCase(firstName.trim())
+                    && user.getLastName().equalsIgnoreCase(lastName.trim())
+                    && user.getEmail().equalsIgnoreCase(email.trim()));
+  }
 }
